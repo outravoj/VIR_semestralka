@@ -1,0 +1,3 @@
+https://machinelearningmastery.com/how-to-interpolate-and-perform-vector-arithmetic-with-faces-using-a-generative-adversarial-network/
+https://pysource.com/2019/03/12/face-landmarks-detection-opencv-with-python/
+https://arxiv.org/pdf/1406.2661.pdf
