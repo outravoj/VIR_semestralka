@@ -1,12 +1,10 @@
-#mport cv2
+import cv2
 import numpy as np
 import dlib
 import transform
-import time
-from matplotlib import pyplot as plt
 from matplotlib.animation import FuncAnimation
-
-
+import matplotlib.pyplot as plt
+import time
 
 def detection(filename, output, output_video=False, output_name = "output.mov"):
     """
@@ -19,7 +17,7 @@ def detection(filename, output, output_video=False, output_name = "output.mov"):
         cap = cv2.VideoCapture(filename)
         length = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     [height, width] = cap.read()[1].shape[:2]
-    video_frame_rate = 30 # nutno upravit pripad od pripadu
+    video_frame_rate = 20 # nutno upravit pripad od pripadu
     desired_frame_rate = 20.0 #chcema 4 sekundy po 20 fps
     if output_video:
         #chceme-li vysledek ukladat i jako video
@@ -35,7 +33,7 @@ def detection(filename, output, output_video=False, output_name = "output.mov"):
     while True:
         _, frame = cap.read()
         counter += step
-        if counter < step:
+        if counter < i:
             continue
         if i == lim or frame is None:
             break
@@ -74,7 +72,6 @@ def detection(filename, output, output_video=False, output_name = "output.mov"):
     if output_video:
         video.release()
 
-
 def visualise(sample,number):
     """nefunkcni , nutno dodelat, roznormalizovat vektor vstupu, a nejak ho ulozit do 4s videa"""
     fig = plt.figure()
@@ -82,19 +79,21 @@ def visualise(sample,number):
     line, = ax.plot([], [], lw=3)
     line.set_data([], [])
     scat = ax.scatter([],[])
+    print(sample.shape)
 
     def init():
         line.set_data([], [])
         return line,
 
     def animate(k):
-        x = np.random.random((68,1))
-        y = np.random.random((68,1))
-        fin = np.zeros((68,2));
+        #x = np.random.random((68,1))
+        #y = np.random.random((68,1))
+        fin = np.zeros((68,2))
         for i in range(68):
-            #fin.append([sample[k,2 * i],sample[k,2*i+1]])
-            fin[i][0] = x[i]
-            fin[i][1] = y[i]
+            fin[i,0] = sample[2 * i,k]
+            fin[i,1] = sample[2*i+1,k]
+            #fin[i][0] = x[i]
+            #fin[i][1] = y[i]
 
         scat.set_offsets(fin)
         return line,
@@ -102,11 +101,11 @@ def visualise(sample,number):
                          frames=80, interval=50, blit=True)
 
     anim.save('sequence_' +str(number)+'.gif', writer='imagemagick')
+    print("amimace hotova")
 
 if __name__=="__main__":
-    #detection("test.mp4", "data", output_video=True)
-   # transform.transform_data("data.npy","tdata.npy")
-    samples = np.load("correct_data.npy")
-    print("Shape of sample[0]: ",samples.shape)
-    visualise(samples[60],5)
+    #detection("", "data3", output_video=True, output_name="output3.mov")
+    transform.create_dataset("data.npy", "correct_data")
+    sample = np.load("correct_data.npy")
+    visualise(sample[211], 5)
     print("hotovo")
