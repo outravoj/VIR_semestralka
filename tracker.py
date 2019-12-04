@@ -88,10 +88,12 @@ def visualise(sample,number):
     def animate(k):
         #x = np.random.random((68,1))
         #y = np.random.random((68,1))
-        fin = np.zeros((68,2))
-        for i in range(68):
+        fin = np.zeros((sample.shape[0]//2,2))
+        for i in range(sample.shape[0]//2):
             fin[i,0] = sample[2 * i,k]
             fin[i,1] = sample[2*i+1,k]
+            if abs(fin[i,0]) <= 0.001:
+                print(i)
             #fin[i][0] = x[i]
             #fin[i][1] = y[i]
 
@@ -105,7 +107,9 @@ def visualise(sample,number):
 
 if __name__=="__main__":
     #detection("", "data3", output_video=True, output_name="output3.mov")
-    transform.create_dataset("data.npy", "correct_data")
-    sample = np.load("correct_data.npy")
-    visualise(sample[211], 5)
-    print("hotovo")
+    transform.create_dataset("data.npy", "correct_data_1")
+    #sample2 = np.load("correct_data_1.npy")
+    #sample = np.load("correct_data_1_reduced.npy")
+    #visualise(sample2[355],6)
+    #visualise(sample[355], 5)
+    #print("hotovo")
