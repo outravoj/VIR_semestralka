@@ -3,7 +3,8 @@ import cv2
 import scipy.ndimage
 import matplotlib.pyplot as plt
 
-
+REDUCED_SET_INDICES = [1, 3, 5, 7, 9, 11, 13, 15, 17, 18, 20, 22, 23, 25, 27, 28, 30, 31, 32, 34, 36, 37, 38, 39, 40,
+                       41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51,52, 53,54,55,56,57,58,59,60,61,62,63,64,65,66,67,68]
 def transform_data(data):
     """
     normalizace jednotlivých bloku dat
@@ -26,6 +27,20 @@ def transform_data(data):
         ratio = ratio / (4 * f)
         t_data[i,:,:] = t_data[i,:,:] / ratio
     return  t_data
+
+
+def create_reduced_dataset(dataset):
+    """
+    vytvoří dataset s redukovaným počtem feature
+    """
+    reduced_dataset = np.zeros((dataset.shape[0], 2*len(REDUCED_SET_INDICES), dataset.shape[2]))
+    offset_indices = np.array(REDUCED_SET_INDICES) - 1
+    for i in range(dataset.shape[0]):
+        for j in range(len(REDUCED_SET_INDICES)):
+            #print(offset_indices[j])
+            reduced_dataset[i,2*j,:] = dataset[i,2*offset_indices[j],:]
+            reduced_dataset[i, 2*j+1,:] = dataset[i, 2*offset_indices[j]+1,:]
+    return reduced_dataset
 
 
 def create_dataset(filename, output, number_of_frames=80, gen_step=55):
@@ -68,5 +83,8 @@ def create_dataset(filename, output, number_of_frames=80, gen_step=55):
     dataset = dataset[0:i,:,:]
     dataset = transform_data(dataset)
     print(dataset.shape)
+    rdataset = create_reduced_dataset(dataset)
     np.save(output, dataset.astype('f4'))
+    print(rdataset.shape)
+    np.save(output + "_reduced",rdataset.astype('f4'))
     print("hotovo")
