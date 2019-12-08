@@ -17,7 +17,7 @@ def detection(filename, output, output_video=False, output_name = "output.mov"):
         cap = cv2.VideoCapture(filename)
         length = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     [height, width] = cap.read()[1].shape[:2]
-    video_frame_rate = 20 # nutno upravit pripad od pripadu
+    video_frame_rate = 30 # nutno upravit pripad od pripadu
     desired_frame_rate = 20.0 #chcema 4 sekundy po 20 fps
     if output_video:
         #chceme-li vysledek ukladat i jako video
@@ -28,7 +28,7 @@ def detection(filename, output, output_video=False, output_name = "output.mov"):
     i = 0
     step = desired_frame_rate / video_frame_rate + 0.1
     counter = 0
-    lim = 30000 #omezeni navic, klidne odstranit
+    lim = 30000000 #omezeni navic, klidne odstranit
     num_mem = np.zeros((min(length,lim), 68*2))
     while True:
         _, frame = cap.read()
@@ -75,7 +75,7 @@ def detection(filename, output, output_video=False, output_name = "output.mov"):
 def visualise(sample,number):
     """nefunkcni , nutno dodelat, roznormalizovat vektor vstupu, a nejak ho ulozit do 4s videa"""
     fig = plt.figure()
-    ax = plt.axes(xlim=(-3, 3), ylim=(-3, 3))
+    ax = plt.axes(xlim=(-3, 3), ylim=(-3,3 ))
     line, = ax.plot([], [], lw=3)
     line.set_data([], [])
     scat = ax.scatter([],[])
@@ -101,15 +101,9 @@ def visualise(sample,number):
         return line,
     anim = FuncAnimation(fig, animate, init_func=init,
                          frames=80, interval=50, blit=True)
-
     anim.save('sequence_' +str(number)+'.gif', writer='imagemagick')
     print("amimace hotova")
 
 if __name__=="__main__":
-    #detection("", "data3", output_video=True, output_name="output3.mov")
-    transform.create_dataset("data.npy", "correct_data_1")
-    #sample2 = np.load("correct_data_1.npy")
-    #sample = np.load("correct_data_1_reduced.npy")
-    #visualise(sample2[355],6)
-    #visualise(sample[355], 5)
-    #print("hotovo")
+    dataset = np.load("datasets/ultimate_dataset.npy")
+    visualise(dataset[0],4)

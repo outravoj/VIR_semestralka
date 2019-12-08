@@ -44,9 +44,14 @@ def create_reduced_dataset(dataset):
 
 
 def create_dataset(filename, output, number_of_frames=80, gen_step=55):
-    data = np.load(filename).astype('f4')
+    data = np.load("datasets/verca1.npy").astype('f4')
+    data2 = np.load("datasets/verca2.npy").astype('f4')
+    data3 = np.load("datasets/verca3.npy").astype('f4')
+    print("Shapes of my data: ",data.shape,data2.shape,data3.shape)
+    data = np.concatenate((data,data2,data3),0)
+    print("Shapes of my data: ", data.shape)
     frame_num = data.shape[0]
-    dataset = np.zeros((frame_num,2*68,number_of_frames))
+    dataset = np.zeros((frame_num//80,2*68,number_of_frames))
     zero_mem = list()
     for i in range(frame_num):
         if np.max(data[i]) == np.min(data[i]):
@@ -66,15 +71,12 @@ def create_dataset(filename, output, number_of_frames=80, gen_step=55):
         else:
             curr = last+1
             while curr + number_of_frames <= new:
-                if curr + number_of_frames >= 30000:
+                if curr + number_of_frames >= 300000:
                     pass
                     print(curr)
                 dataset[i] = data[curr:curr+number_of_frames,:].transpose()
                 i+=1
                 curr += gen_step
-
-            if i > 29040:
-                pass
             dataset[i] = data[new-number_of_frames:new,:].transpose()
             i+=1
             last = new
@@ -88,3 +90,9 @@ def create_dataset(filename, output, number_of_frames=80, gen_step=55):
     print(rdataset.shape)
     np.save(output + "_reduced",rdataset.astype('f4'))
     print("hotovo")
+
+if __name__ == '__main__':
+    """
+    je třeba rozlišovat mezi input se 136 a 106 kanály - input resp reduced_input, vznikají oba v transform.py
+    """
+    create_dataset("verca1.npy","ultimate_dataset")

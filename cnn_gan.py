@@ -158,7 +158,9 @@ def learn(discriminator, generator, opt_d, opt_g, loader, epochs, device):
         j = 0
         counter = 0
         for batch, _ in loader:
-            #print(batch.shape, real_labels.shape)
+            print(batch.shape)
+            permuted = batch.permute(2,0,1)
+            print(permuted.shape)
             #trenink diskriminatoru"
             """
             hyperparametry pro řízení iterací nad jednotlivými sítěmi
@@ -235,7 +237,7 @@ def main(path=""):
         torch.cuda.empty_cache()
     if path == "":
         path = PATH
-    loader = load_data(args.batch_size, "reduced_input.npy", device=device, store_dir=path, shuffle=True)
+    loader = load_data(args.batch_size, "verca1_dataset_reduced.npy", device=device, store_dir=path, shuffle=True)
     discriminator = Discriminator(2*53)
     generator = Generator2(2*53)
     if device:
@@ -295,7 +297,7 @@ if __name__ == '__main__':
     """
     dir_path = os.path.dirname(os.path.realpath(__file__))
     print(dir_path)
-    #main(dir_path)
-    sampler(2,4)
-    sample = np.load("reduced_input.npy")
-    visualise(sample[0],12)
+    main(dir_path)
+    #sampler(2,4)
+    #sample = np.load("reduced_input.npy")
+    #visualise(sample[0],12)
