@@ -1,11 +1,12 @@
-import cv2
+#import cv2
 import numpy as np
-import dlib
+#import dlib
 import transform
 from matplotlib.animation import FuncAnimation
 import matplotlib.pyplot as plt
 import time
 
+'''
 def detection(filename, output, output_video=False, output_name = "output.mov"):
     """
     zpracovava video filename, pokud filename = "", pouzije webku, radsi mensi rozliseni, jinak dlouho trva
@@ -71,9 +72,10 @@ def detection(filename, output, output_video=False, output_name = "output.mov"):
     cap.release()
     if output_video:
         video.release()
+'''
 
 def visualise(sample,number):
-    """nefunkcni , nutno dodelat, roznormalizovat vektor vstupu, a nejak ho ulozit do 4s videa"""
+    """Funkcni, uklada 4s videa"""
     fig = plt.figure()
     ax = plt.axes(xlim=(-3, 3), ylim=(-3,3 ))
     line, = ax.plot([], [], lw=3)
@@ -92,8 +94,6 @@ def visualise(sample,number):
         for i in range(sample.shape[0]//2):
             fin[i,0] = sample[2 * i,k]
             fin[i,1] = sample[2*i+1,k]
-            if abs(fin[i,0]) <= 0.001:
-                print(i)
             #fin[i][0] = x[i]
             #fin[i][1] = y[i]
 

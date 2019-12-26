@@ -15,8 +15,12 @@ from torch.autograd import Variable
 
 PATH = "/local/temporary/vir/hw01/pkl"
 
-"ZATÍM JSEM NETRÉNOVAL NA SERVERECH === TŘEBA OTESTOVAT A DOLADIT"
+'''
+Tipy na trenink GAN siti z prednasky:
 
+
+
+'''
 
 def load_data(batch_size, filename, device, shuffle=True, store_dir='./data'):
     """
@@ -37,14 +41,13 @@ def load_data(batch_size, filename, device, shuffle=True, store_dir='./data'):
 
 class Discriminator(torch.nn.Module):
     """
-    zatím 1D konvoluční síť, 4 vrstvy konvoluce, na konci lineárka a sigmoida - chceme na závěr 2 psti - pokud 1, pak si síť myslí, že
-    obrázek je real, pokud 0, tak fake
+
     """
     def __init__(self, num_of_features,batch_size):
         super(Discriminator,self).__init__()
         self.batch_size = batch_size
-        self.lstm = nn.LSTM(num_of_features,30,5)
-        self.lin1 = nn.Linear(30,1)
+        self.lstm = nn.LSTM(num_of_features,100,2)
+        self.lin1 = nn.Linear(100,1)
 
         self.weights_initialization()
 
@@ -64,15 +67,22 @@ class Generator(torch.nn.Module):
     def __init__(self, input_size, hidden_size, output_size):
         super(Generator, self).__init__()
         self.hidden_size = hidden_size
-
-        self.lstm = nn.LSTM(100,106,6)
-        self.lstm2 = nn.LSTM(106,106,5)
+        self.linear1 = nn.Linear(80,1000)
+        self.linear2 = nn.Linear(1000, 106)
+        self.lstm = nn.LSTM(100,80,2,batch_first=True)
         self.weights_initialization()
+        self.lrelu = nn.LeakyReLU(negative_slope=0.05)
 
 
     def forward(self, noise):
+        noise = noise.permute((1,0,2))
         x,_ = self.lstm(noise)
-        x,_ = self.lstm2(x)
+        #print("Shape of x before lin1: ", x.shape)
+        x = self.lrelu(self.linear1(x))
+        #print("Shape of x after lin1: ",x.shape)
+        x = self.linear2(x)
+        #print("Shape of x after lin2: ", x.shape)
+        x = x.permute((1,0,2))
         return x
 
     def initHidden(self):
@@ -88,11 +98,10 @@ class Generator(torch.nn.Module):
 
 
 def sample_from_distribution(number_of_samples, dims_1,dims2):
-    """
-    vytváří normalizované vektory délky dims, vrátí jich to number_of_samples
-    number_of_samples jsou typicky batchsize, normální rozdělení
-    """
-    samples = (torch.from_numpy(np.random.rand(number_of_samples, dims_1,dims2))-25)*50
+    samples = (torch.from_numpy(np.random.rand(number_of_samples, dims_1,dims2))-1)*2
+    for i in range(dims_1):
+        for j in range(number_of_samples):
+            samples[j,i,:]= np.linalg.norm(samples[j,i,:])
     return samples
 
 
@@ -103,6 +112,7 @@ def learn(discriminator, generator, opt_d, opt_g, loader, epochs, device):
     discriminator.double()
     fake_label = 0 #faky jako 0, realy jako 1
     real_label = 1
+    generator_training = 0
     for i in range(epochs):
         print("EPOCH: ",i)
         for batch, _ in loader:
@@ -125,11 +135,13 @@ def learn(discriminator, generator, opt_d, opt_g, loader, epochs, device):
             real_labels = real_labels.to(device)
 
             errD_real = F.binary_cross_entropy(real_pred.float(), real_labels.float())
+            errD_real.backward()
             print("Loss na real: ",errD_real)
             #print("Real_predictions: ",real_pred)
             # bereme CL loss, chceme ji minimalizovat
             # backward, ale čekáme na fake data
             D_x = real_pred.mean().item()
+
 
 
             noise = Variable(sample_from_distribution(80,60,100).double()).to(device)  # sample fake dat podle batche
@@ -138,41 +150,45 @@ def learn(discriminator, generator, opt_d, opt_g, loader, epochs, device):
 
             fake_pred = discriminator(generated.double(),60)  # odhady diskriminatoru na fake datech
 
-            fake_labels = torch.full(fake_pred.shape, fake_label + 0.15) + (
-                        torch.rand(fake_pred.shape) - 0.5) * 0.3  # opět šumím labely na 0.0 - 0.3
+            fake_labels = torch.full(fake_pred.shape, fake_label + 0.07) + (
+                        torch.rand(fake_pred.shape) - 0.5) * 0.15  # opět šumím labely na 0.0 - 0.3
             fake_labels = fake_labels.to(device)
 
+            #print("Discriminator predictions:",fake_pred)
             errD_fake = F.binary_cross_entropy(fake_pred.float(), fake_labels.float())  # fake loss
             print("Loss na fake: ", errD_fake)
             D_G_z1 = fake_pred.mean().item()
-            errD = errD_fake + errD_real
+            errD = errD_fake
             errD.backward()
-            opt_d.step()  # konečně step
+            opt_d.step()  # k   onečně step
 
 #    -------------        GENERATOR TRAINNG PART       -----------------
+            if generator_training%1 == 0:
+                opt_g.zero_grad()
 
-            opt_g.zero_grad()
+                noise = Variable(sample_from_distribution(80, 60, 100).double()).to(device)  # sample fake dat podle batche
+                generated = generator(noise)
+                pred = discriminator(generated.double(),60)
 
-            noise = Variable(sample_from_distribution(80, 60, 100).double()).to(device)  # sample fake dat podle batche
-            generated = generator(noise)
+                labels = torch.full(pred.shape,
+                                    real_label)  # jako labely beru jedničky, i když jsou to faky - kvůli lepšímu trénování generátoru
+                labels = labels.to(device)
+                errG = F.binary_cross_entropy(pred.float(), labels.float())
+                #print("Labels of generaed data: ",pred)
+                errG.backward()
+                D_G_z2 = pred.mean().item()
+                opt_g.step()  # normálně backprop na generátoru
 
-            pred = discriminator(generated.double(),60)
+                print('[%d/%d] Loss_D: %.4f Loss_G: %.4f D(x): %.4f D(G(z)): %.4f / %.4f'
+                      % (i, epochs,
+                         errD.item(), errG.item(), D_x, D_G_z1, D_G_z2))
 
-            labels = torch.full(pred.shape,
-                                real_label)  # jako labely beru jedničky, i když jsou to faky - kvůli lepšímu trénování generátoru
-            labels = labels.to(device)
-            errG = F.binary_cross_entropy(pred.float(), labels.float())
-            #print("Labels of generaed data: ",pred)
-            errG.backward()
-            D_G_z2 = pred.mean().item()
-            opt_g.step()  # normálně backprop na generátoru
-
-            print('[%d/%d] Loss_D: %.4f Loss_G: %.4f D(x): %.4f D(G(z)): %.4f / %.4f'
-                  % (i, epochs,
-                     errD.item(), errG.item(), D_x, D_G_z1, D_G_z2))
-
-
+            generator_training += 1
         if (i+1)%20==0:
+            noise = Variable(sample_from_distribution(80, 1, 100).double()).to(device)  # sample fake dat podle batche
+            generated = generator(noise)
+            generated = generated.permute(1, 2, 0)[0, :, :]
+            visualise(generated, i)
             f = str(i) + ".pt"
             torch.save(discriminator.state_dict(), "models/model_d" + f)
             torch.save(generator.state_dict(), "models/model_g" + f)
@@ -180,7 +196,7 @@ def learn(discriminator, generator, opt_d, opt_g, loader, epochs, device):
 
 def parse_args():
     parser = argparse.ArgumentParser('Simple MNIST classifier')
-    parser.add_argument('--epochs', '-e', default=100, type=int)
+    parser.add_argument('--epochs', '-e', default=1000, type=int)
     parser.add_argument('--batch_size', '-bs', default=128, type=int)
     parser.add_argument('--store_dir', '-sd', default='./', type=str)
     return parser.parse_args()
@@ -205,12 +221,12 @@ def main(path=""):
         discriminator.to(device)
 
     #lr zatím pro oba stejný, potřebujeme 2 optimizery, možná 2 lr?"
-    lr_d = 0.0005
-    lr = 0.001
+    lr_d = 0.001
+    lr = 0.003
 
     #jeden optimizer pro diskriminator a druhy pro generator"
-    opt_d = optim.Adam(discriminator.parameters(), lr=lr_d, betas=(0.5, 0.999))
-    opt_g = optim.Adam(generator.parameters(), lr=lr, betas=(0.5, 0.999))
+    opt_d = optim.Adam(discriminator.parameters(), lr=lr_d, betas=(0.5, 0.999),weight_decay= 0.0005)
+    opt_g = optim.Adam(generator.parameters(), lr=lr, betas=(0.5, 0.999),weight_decay = 0.005)
     learn(discriminator, generator, opt_d, opt_g, loader, args.epochs, device)
     torch.save(discriminator.state_dict(), "models/model_d.pt")
     torch.save(generator.state_dict(), "models/model_g.pt")
@@ -232,7 +248,7 @@ def sampler(typ, num):
     """
     funkce, vygeneruje data z nauceneho generatoru
     """
-    generator = load_model("models/model_g59.pt",typ)
+    generator = load_model("cantor_models/models/model_g99.pt",typ)
     device = torch.device('cuda')
     generator.to(device)
     generator.double()
@@ -259,5 +275,5 @@ if __name__ == '__main__':
     """
     dir_path = os.path.dirname(os.path.realpath(__file__))
     print(dir_path)
-    #main(dir_path)
-    sampler(1, 5)
+    main(dir_path)
+    #sampler(1, 5)
