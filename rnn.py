@@ -46,9 +46,10 @@ class Discriminator(torch.nn.Module):
     def __init__(self, num_of_features,batch_size):
         super(Discriminator,self).__init__()
         self.batch_size = batch_size
-        self.lstm = nn.LSTM(num_of_features,100,2)
-        self.lin1 = nn.Linear(100,1)
-
+        self.lstm = nn.LSTM(num_of_features,150,3)
+        self.lin1 = nn.Linear(80*150,200)
+        self.lin2 = nn.Linear(200,1)
+        self.relu = nn.LeakyReLU()
         self.weights_initialization()
 
     def weights_initialization(self):
@@ -58,8 +59,9 @@ class Discriminator(torch.nn.Module):
 
     def forward(self, x,batch_size):
         x,h = self.lstm(x)
-        x = x[-1].view(batch_size,-1)
-        x = torch.sigmoid(self.lin1(x))
+        x = x.permute((1,0,2))
+        x = x.reshape((batch_size,80*150))
+        x = torch.sigmoid(self.lin2(self.relu(self.lin1(x))))
         return x
 
 
@@ -67,9 +69,9 @@ class Generator(torch.nn.Module):
     def __init__(self, input_size, hidden_size, output_size):
         super(Generator, self).__init__()
         self.hidden_size = hidden_size
-        self.linear1 = nn.Linear(80,1000)
-        self.linear2 = nn.Linear(1000, 106)
-        self.lstm = nn.LSTM(100,80,2,batch_first=True)
+        self.linear1 = nn.Linear(100,300)
+        self.linear2 = nn.Linear(300, 106)
+        self.lstm = nn.LSTM(100,100,2,batch_first=True)
         self.weights_initialization()
         self.lrelu = nn.LeakyReLU(negative_slope=0.05)
 
@@ -98,10 +100,7 @@ class Generator(torch.nn.Module):
 
 
 def sample_from_distribution(number_of_samples, dims_1,dims2):
-    samples = (torch.from_numpy(np.random.rand(number_of_samples, dims_1,dims2))-1)*2
-    for i in range(dims_1):
-        for j in range(number_of_samples):
-            samples[j,i,:]= np.linalg.norm(samples[j,i,:])
+    samples = (torch.from_numpy(np.random.rand(number_of_samples, dims_1,dims2))-0.5)*2
     return samples
 
 
@@ -133,7 +132,6 @@ def learn(discriminator, generator, opt_d, opt_g, loader, epochs, device):
             """
             real_labels = torch.full(real_pred.shape, real_label) + (torch.rand(real_pred.shape) - 0.5) * 0.4
             real_labels = real_labels.to(device)
-
             errD_real = F.binary_cross_entropy(real_pred.float(), real_labels.float())
             errD_real.backward()
             print("Loss na real: ",errD_real)
@@ -151,10 +149,9 @@ def learn(discriminator, generator, opt_d, opt_g, loader, epochs, device):
             fake_pred = discriminator(generated.double(),60)  # odhady diskriminatoru na fake datech
 
             fake_labels = torch.full(fake_pred.shape, fake_label + 0.07) + (
-                        torch.rand(fake_pred.shape) - 0.5) * 0.15  # opět šumím labely na 0.0 - 0.3
+                        torch.rand(fake_pred.shape) - 0.5) * 0.3  # opět šumím labely na 0.0 - 0.3
             fake_labels = fake_labels.to(device)
 
-            #print("Discriminator predictions:",fake_pred)
             errD_fake = F.binary_cross_entropy(fake_pred.float(), fake_labels.float())  # fake loss
             print("Loss na fake: ", errD_fake)
             D_G_z1 = fake_pred.mean().item()
@@ -163,28 +160,29 @@ def learn(discriminator, generator, opt_d, opt_g, loader, epochs, device):
             opt_d.step()  # k   onečně step
 
 #    -------------        GENERATOR TRAINNG PART       -----------------
-            if generator_training%1 == 0:
-                opt_g.zero_grad()
+            if generator_training%4 == 0:
+                for k in range(4):
+                    opt_g.zero_grad()
 
-                noise = Variable(sample_from_distribution(80, 60, 100).double()).to(device)  # sample fake dat podle batche
-                generated = generator(noise)
-                pred = discriminator(generated.double(),60)
+                    noise = Variable(sample_from_distribution(80, 60, 100).double()).to(device)  # sample fake dat podle batche
+                    generated = generator(noise)
+                    pred = discriminator(generated.double(),60)
 
-                labels = torch.full(pred.shape,
-                                    real_label)  # jako labely beru jedničky, i když jsou to faky - kvůli lepšímu trénování generátoru
-                labels = labels.to(device)
-                errG = F.binary_cross_entropy(pred.float(), labels.float())
-                #print("Labels of generaed data: ",pred)
-                errG.backward()
-                D_G_z2 = pred.mean().item()
-                opt_g.step()  # normálně backprop na generátoru
+                    labels = torch.full(pred.shape,
+                                        real_label)  # jako labely beru jedničky, i když jsou to faky - kvůli lepšímu trénování generátoru
+                    labels = labels.to(device)
+                    errG = F.binary_cross_entropy(pred.float(), labels.float())
+                    #print("Labels of generaed data: ",pred)
+                    errG.backward()
+                    D_G_z2 = pred.mean().item()
+                    opt_g.step()  # normálně backprop na generátoru
 
-                print('[%d/%d] Loss_D: %.4f Loss_G: %.4f D(x): %.4f D(G(z)): %.4f / %.4f'
-                      % (i, epochs,
-                         errD.item(), errG.item(), D_x, D_G_z1, D_G_z2))
+                    print('[%d/%d] Loss_D: %.4f Loss_G: %.4f D(x): %.4f D(G(z)): %.4f / %.4f'
+                          % (i, epochs,
+                             errD.item(), errG.item(), D_x, D_G_z1, D_G_z2))
 
             generator_training += 1
-        if (i+1)%20==0:
+        if (i+1)%5 ==0:
             noise = Variable(sample_from_distribution(80, 1, 100).double()).to(device)  # sample fake dat podle batche
             generated = generator(noise)
             generated = generated.permute(1, 2, 0)[0, :, :]
@@ -222,7 +220,7 @@ def main(path=""):
 
     #lr zatím pro oba stejný, potřebujeme 2 optimizery, možná 2 lr?"
     lr_d = 0.001
-    lr = 0.003
+    lr = 0.001
 
     #jeden optimizer pro diskriminator a druhy pro generator"
     opt_d = optim.Adam(discriminator.parameters(), lr=lr_d, betas=(0.5, 0.999),weight_decay= 0.0005)
